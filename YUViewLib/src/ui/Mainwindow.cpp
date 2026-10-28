@@ -46,6 +46,7 @@
 #include <playlistitem/playlistItems.h>
 #include <ui/Mainwindow_performanceTestDialog.h>
 #include <ui/SettingsDialog.h>
+#include <ui/widgets/PixelZoomerWidget.h>
 #include <ui/widgets/PlaylistTreeWidget.h>
 
 MainWindow::MainWindow(bool useAlternativeSources, QWidget *parent) : QMainWindow(parent)
@@ -126,6 +127,18 @@ MainWindow::MainWindow(bool useAlternativeSources, QWidget *parent) : QMainWindo
           &PlaylistTreeWidget::selectionRangeChanged,
           ui.bitstreamAnalysis,
           &BitstreamAnalysisWidget::currentSelectedItemsChanged);
+  connect(ui.playlistTreeWidget,
+          &PlaylistTreeWidget::selectionRangeChanged,
+          this,
+          &MainWindow::currentSelectedItemsChangedForPixelZoomer);
+  connect(ui.pixelZoomerWidget,
+          &PixelZoomerWidget::pixelZoomRequested,
+          this,
+          &MainWindow::pixelZoomRequested);
+  connect(ui.pixelZoomerWidget,
+          &PixelZoomerWidget::goBackRequested,
+          this,
+          &MainWindow::goBackToPreviousView);
   connect(ui.playlistTreeWidget,
           &PlaylistTreeWidget::selectionRangeChanged,
           this,
@@ -372,6 +385,7 @@ void MainWindow::createMenusAndActions()
   addDockViewAction(ui.propertiesDock, "Show &Properties", Qt::CTRL | Qt::Key_P);
   addDockViewAction(ui.fileInfoDock, "Show &Info", Qt::CTRL | Qt::Key_I);
   addDockViewAction(ui.cachingInfoDock, "Show Caching Info");
+  addDockViewAction(ui.pixelZoomerDock, "Show &Pixel Zoomer");
   viewMenu->addSeparator();
   addDockViewAction(ui.playbackControllerDock, "Show Playback &Controls", Qt::CTRL | Qt::Key_D);
 
@@ -573,6 +587,68 @@ void MainWindow::currentSelectedItemsChanged(playlistItem *item1, playlistItem *
     QString newCaption = "YUView - " + item1->text(0);
     setWindowTitle(newCaption);
   }
+}
+
+void MainWindow::pixelZoomRequested(int x, int y)
+{
+  // Zooming to a pixel makes no sense while playback is running (the pixel values change every
+  // frame and raw values are not drawn during playback).
+  if (ui.playbackController->playing())
+    return;
+
+  const auto items = ui.playlistTreeWidget->getSelectedItems();
+  auto       item  = items[0];
+  if (!item)
+    return;
+
+  const auto size = item->getSize();
+  if (x < 0 || x >= size.width() || y < 0 || y >= size.height())
+    return;
+
+  // Save the current view state for "Back". Only one slot is kept (the next Go overwrites it).
+  ui.displaySplitView->getViewState(pixelZoomerPreviousOffset,
+                                    pixelZoomerPreviousZoom,
+                                    pixelZoomerPreviousSplitPoint,
+                                    pixelZoomerPreviousMode);
+  pixelZoomerPreviousStateValid = true;
+
+  // Zoom in so that the raw pixel values are drawn (SPLITVIEW_DRAW_VALUES_ZOOMFACTOR).
+  const double zoom = double(SPLITVIEW_DRAW_VALUES_ZOOMFACTOR);
+
+  // The item is drawn centered at (0,0) scaled by the zoom factor, so the offset that puts
+  // the pixel (x,y) at the center of the view is:
+  const QPointF offset =
+      (QPointF(size.width(), size.height()) / 2.0 - QPointF(x + 0.5, y + 0.5)) * zoom;
+
+  ui.displaySplitView->setViewState(offset,
+                                    zoom,
+                                    pixelZoomerPreviousSplitPoint,
+                                    pixelZoomerPreviousMode);
+}
+
+void MainWindow::goBackToPreviousView()
+{
+  // Playback also changes the view state, so going back while playing would produce a
+  // confusing mix. Keep Back symmetric to Go.
+  if (!pixelZoomerPreviousStateValid || ui.playbackController->playing())
+    return;
+
+  // Swap the view state with the stored one (see the member comment for the semantics).
+  QPointF offset;
+  double  zoom;
+  double  splitPoint;
+  int     mode;
+  ui.displaySplitView->getViewState(offset, zoom, splitPoint, mode);
+
+  ui.displaySplitView->setViewState(pixelZoomerPreviousOffset,
+                                    pixelZoomerPreviousZoom,
+                                    pixelZoomerPreviousSplitPoint,
+                                    pixelZoomerPreviousMode);
+
+  pixelZoomerPreviousOffset     = offset;
+  pixelZoomerPreviousZoom       = zoom;
+  pixelZoomerPreviousSplitPoint = splitPoint;
+  pixelZoomerPreviousMode       = mode;
 }
 
 void MainWindow::deleteSelectedItems()

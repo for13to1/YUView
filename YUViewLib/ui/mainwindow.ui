@@ -218,6 +218,15 @@
    </attribute>
    <widget class="PlaybackController" name="playbackController"/>
   </widget>
+  <widget class="QDockWidget" name="pixelZoomerDock">
+   <property name="windowTitle">
+    <string>Pixel Zoomer</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>8</number>
+   </attribute>
+   <widget class="PixelZoomerWidget" name="pixelZoomerWidget"/>
+  </widget>
   <widget class="QDockWidget" name="fileInfoDock">
    <property name="windowTitle">
     <string>Info</string>
@@ -309,6 +318,12 @@
    <class>BitstreamAnalysisWidget</class>
    <extends>QWidget</extends>
    <header>ui/widgets/BitstreamAnalysisWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>PixelZoomerWidget</class>
+   <extends>QWidget</extends>
+   <header>ui/widgets/PixelZoomerWidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

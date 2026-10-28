@@ -73,12 +73,22 @@ public slots:
 private slots:
 
   void toggleFullscreen();
+
+  // The selection of playlist items changed, so the saved view state for "Back" may no longer
+  // make sense for the new selection.
+  void currentSelectedItemsChangedForPixelZoomer(playlistItem *, playlistItem *)
+  {
+    pixelZoomerPreviousStateValid = false;
+  }
+
   void deleteSelectedItems();
   void showAbout() { showAboutHelp(true); }
   void showHelp() { showAboutHelp(false); }
   void showSettingsWindow();
   void saveScreenshot();
   void showFileOpenDialog();
+  void pixelZoomRequested(int x, int y);
+  void goBackToPreviousView();
   void resetWindowLayout();
   void closeAndClearSettings();
 
@@ -165,4 +175,13 @@ private:
   SeparateWindow                     separateViewWindow;
   bool showNormalMaximized;     // When going to full screen: Was this windows maximized?
   bool panelsVisible[5]{false}; // Which panels are visible when going to full-screen mode?
+
+  // The view state (offset, zoom, split point, mode) to swap with when pressing "Back" in the
+  // "Pixel Zoomer" panel. Only one slot is kept. Back exchanges the current view state with
+  // this slot, so without entering new coordinates the view toggles A -> B -> A -> B.
+  bool     pixelZoomerPreviousStateValid{false};
+  QPointF  pixelZoomerPreviousOffset;
+  double   pixelZoomerPreviousZoom;
+  double   pixelZoomerPreviousSplitPoint;
+  int      pixelZoomerPreviousMode;
 };
