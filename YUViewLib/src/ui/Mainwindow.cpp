@@ -46,6 +46,7 @@
 #include <playlistitem/playlistItems.h>
 #include <ui/Mainwindow_performanceTestDialog.h>
 #include <ui/SettingsDialog.h>
+#include <ui/widgets/PixelZoomerWidget.h>
 #include <ui/widgets/PlaylistTreeWidget.h>
 
 MainWindow::MainWindow(bool useAlternativeSources, QWidget *parent) : QMainWindow(parent)
@@ -68,7 +69,7 @@ MainWindow::MainWindow(bool useAlternativeSources, QWidget *parent) : QMainWindo
   statusBar()->hide();
 
   saveWindowsStateOnExit = true;
-  for (int i = 0; i < 5; i++)
+  for (int i = 0; i < 6; i++)
     panelsVisible[i] = false;
 
   // Initialize the separate window
@@ -126,6 +127,18 @@ MainWindow::MainWindow(bool useAlternativeSources, QWidget *parent) : QMainWindo
           &PlaylistTreeWidget::selectionRangeChanged,
           ui.bitstreamAnalysis,
           &BitstreamAnalysisWidget::currentSelectedItemsChanged);
+  connect(ui.playlistTreeWidget,
+          &PlaylistTreeWidget::selectionRangeChanged,
+          this,
+          &MainWindow::currentSelectedItemsChangedForPixelZoomer);
+  connect(ui.pixelZoomerWidget,
+          &PixelZoomerWidget::pixelZoomRequested,
+          this,
+          &MainWindow::pixelZoomRequested);
+  connect(ui.pixelZoomerWidget,
+          &PixelZoomerWidget::goBackRequested,
+          this,
+          &MainWindow::goBackToPreviousView);
   connect(ui.playlistTreeWidget,
           &PlaylistTreeWidget::selectionRangeChanged,
           this,
@@ -372,6 +385,7 @@ void MainWindow::createMenusAndActions()
   addDockViewAction(ui.propertiesDock, "Show &Properties", Qt::CTRL | Qt::Key_P);
   addDockViewAction(ui.fileInfoDock, "Show &Info", Qt::CTRL | Qt::Key_I);
   addDockViewAction(ui.cachingInfoDock, "Show Caching Info");
+  addDockViewAction(ui.pixelZoomerDock, "Show &Pixel Zoomer");
   viewMenu->addSeparator();
   addDockViewAction(ui.playbackControllerDock, "Show Playback &Controls", Qt::CTRL | Qt::Key_D);
 
@@ -575,6 +589,82 @@ void MainWindow::currentSelectedItemsChanged(playlistItem *item1, playlistItem *
   }
 }
 
+void MainWindow::pixelZoomRequested(int x, int y)
+{
+  // Zooming to a pixel makes no sense while playback is running (the pixel values change every
+  // frame and raw values are not drawn during playback).
+  if (ui.playbackController->playing())
+    return;
+
+  const auto items = ui.playlistTreeWidget->getSelectedItems();
+  auto       item  = items[0];
+  if (!item)
+    return;
+
+  const auto size = item->getSize();
+  if (x < 0 || x >= size.width() || y < 0 || y >= size.height())
+    return;
+
+  // Zoom in so that the raw pixel values are drawn (SPLITVIEW_DRAW_VALUES_ZOOMFACTOR).
+  const double zoom = double(SPLITVIEW_DRAW_VALUES_ZOOMFACTOR);
+
+  // The item is drawn centered at (0,0) scaled by the zoom factor, so the offset that puts the
+  // center of pixel (x,y) at the center of the view is:
+  const QPointF offset =
+      (QPointF(size.width(), size.height()) / 2.0 - QPointF(x + 0.5, y + 0.5)) * zoom;
+
+  QPointF currentOffset;
+  double  currentZoom;
+  double  splitPoint;
+  int     mode;
+  ui.displaySplitView->getViewState(currentOffset, currentZoom, splitPoint, mode);
+
+  // The view already shows this pixel. Then there is nothing to do and, in particular, the
+  // "Back" target must not be overwritten with the current view.
+  if (currentOffset == offset && currentZoom == zoom)
+    return;
+
+  // Save the current view state for "Back". Only one slot is kept.
+  pixelZoomerPreviousOffset     = currentOffset;
+  pixelZoomerPreviousZoom       = currentZoom;
+  pixelZoomerPreviousSplitPoint = splitPoint;
+  pixelZoomerPreviousMode       = mode;
+  pixelZoomerPreviousStateValid = true;
+
+  ui.displaySplitView->setViewState(offset, zoom, splitPoint, mode);
+
+  // At this zoom factor the raw values are drawn, but they are only loaded for new frames.
+  ui.displaySplitView->update(true, false);
+}
+
+void MainWindow::goBackToPreviousView()
+{
+  // Playback changes the view state too, so going back while playing is meaningless. Keep Back
+  // symmetric to Go.
+  if (!pixelZoomerPreviousStateValid || ui.playbackController->playing())
+    return;
+
+  // Swap the view state with the stored one (see the member comment for the semantics).
+  QPointF offset;
+  double  zoom;
+  double  splitPoint;
+  int     mode;
+  ui.displaySplitView->getViewState(offset, zoom, splitPoint, mode);
+
+  ui.displaySplitView->setViewState(pixelZoomerPreviousOffset,
+                                    pixelZoomerPreviousZoom,
+                                    pixelZoomerPreviousSplitPoint,
+                                    pixelZoomerPreviousMode);
+
+  // The restored view can also be at a zoom factor at which the raw values are drawn.
+  ui.displaySplitView->update(true, false);
+
+  pixelZoomerPreviousOffset     = offset;
+  pixelZoomerPreviousZoom       = zoom;
+  pixelZoomerPreviousSplitPoint = splitPoint;
+  pixelZoomerPreviousMode       = mode;
+}
+
 void MainWindow::deleteSelectedItems()
 {
   // qDebug() << QTime::currentTime().toString("hh:mm:ss.zzz") <<
@@ -698,6 +788,8 @@ void MainWindow::toggleFullscreen()
       ui.fileInfoDock->show();
     if (panelsVisible[4])
       ui.cachingInfoDock->show();
+    if (panelsVisible[5])
+      ui.pixelZoomerDock->show();
 
     if (!is_Q_OS_MAC)
       ui.menuBar->show();
@@ -718,6 +810,7 @@ void MainWindow::toggleFullscreen()
     panelsVisible[2] = ui.playbackControllerDock->isVisible();
     panelsVisible[3] = ui.fileInfoDock->isVisible();
     panelsVisible[4] = ui.cachingInfoDock->isVisible();
+    panelsVisible[5] = ui.pixelZoomerDock->isVisible();
 
     // Hide panels
     ui.propertiesDock->hide();
@@ -727,6 +820,7 @@ void MainWindow::toggleFullscreen()
       ui.playbackControllerDock->hide();
     ui.fileInfoDock->hide();
     ui.cachingInfoDock->hide();
+    ui.pixelZoomerDock->hide();
 
     if (!is_Q_OS_MAC)
       ui.menuBar->hide();
@@ -957,6 +1051,7 @@ void MainWindow::resetWindowLayout()
   ui.playbackControllerDock->setFloating(false);
   ui.fileInfoDock->setFloating(false);
   ui.cachingInfoDock->setFloating(false);
+  ui.pixelZoomerDock->setFloating(false);
 
   // show the menu bar
   if (!is_Q_OS_MAC)
