@@ -35,8 +35,11 @@
 #include <QDebug>
 
 #include <QBuffer>
+#include <QClipboard>
 #include <QDragMoveEvent>
 #include <QFileDialog>
+#include <QFileInfo>
+#include <QGuiApplication>
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QMenu>
@@ -458,6 +461,20 @@ void PlaylistTreeWidget::contextMenuEvent(QContextMenuEvent *event)
     menu.addSeparator();
     menu.addAction("Delete Item", this, &PlaylistTreeWidget::deletePlaylistItems);
     menu.addAction("Duplicate Item", this, &PlaylistTreeWidget::duplicateSelectedItems);
+
+    // Only items that were loaded from a file have a path that can be copied.
+    auto playlistItemAtCursor = dynamic_cast<playlistItem *>(item);
+    if (playlistItemAtCursor && playlistItemAtCursor->properties().isFileSource)
+    {
+      const QFileInfo file(playlistItemAtCursor->properties().name);
+      const auto      path     = file.absoluteFilePath();
+      const auto      fileName = file.fileName();
+
+      menu.addSeparator();
+      menu.addAction("Copy Path", this, [path] { QGuiApplication::clipboard()->setText(path); });
+      menu.addAction(
+        "Copy Filename", this, [fileName] { QGuiApplication::clipboard()->setText(fileName); });
+    }
   }
 
   menu.exec(event->globalPos());
