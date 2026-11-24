@@ -791,7 +791,7 @@ void MainWindow::toggleFullscreen()
     if (panelsVisible[5])
       ui.pixelZoomerDock->show();
 
-    if (!is_Q_OS_MAC)
+    if (!is_Q_OS_MACOS)
       ui.menuBar->show();
     ui.tabWidget->tabBar()->show();
 
@@ -822,7 +822,7 @@ void MainWindow::toggleFullscreen()
     ui.cachingInfoDock->hide();
     ui.pixelZoomerDock->hide();
 
-    if (!is_Q_OS_MAC)
+    if (!is_Q_OS_MACOS)
       ui.menuBar->hide();
     ui.tabWidget->tabBar()->hide();
 
@@ -1054,7 +1054,7 @@ void MainWindow::resetWindowLayout()
   ui.pixelZoomerDock->setFloating(false);
 
   // show the menu bar
-  if (!is_Q_OS_MAC)
+  if (!is_Q_OS_MACOS)
     ui.menuBar->show();
 
   // Reset main window state (the size and position of the dock widgets). The code to obtain this
