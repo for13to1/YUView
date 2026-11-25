@@ -140,9 +140,11 @@ std::optional<int> guessFPSFromFPSOrHzIndicators(const std::string &name)
 
 std::optional<unsigned> guessBitDepthFromName(const std::string &name)
 {
+  // Two digit values first, otherwise 9 would match the 9 in 19.
   const auto REGEXP_LIST = {
-      "(8|9|10|12|14|16)-?(bit)",                // E.g. 10bit, 10BIT, 10-bit, 10-BIT
-      "(?:_|\\.|-)(8|9|10|12|14|16)b(?:_|\\.|-)" // E.g. _16b_ .8b. -12b-
+    "(1[0-9]|2[0-9]|3[0-2]|8|9)-?(bit)",                      // E.g. 10bit, 10-bit, 32BIT
+    "(?:_|\\.|-)(1[0-9]|2[0-9]|3[0-2]|8|9)b(?:_|\\.|-|$)",    // E.g. _16b_ -32b
+    "p(1[0-9]|2[0-9]|3[0-2]|8|9)(?:le|be|LE|BE)(?:_|\\.|-|$)" // E.g. yuv420p32le
   };
 
   for (const auto &regExpStr : REGEXP_LIST)

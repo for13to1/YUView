@@ -68,7 +68,7 @@ std::optional<Subsampling> parseSubsamplingText(const std::string_view text)
 std::optional<int> parseBitDepthText(const std::string &bitdepthStr)
 {
   const auto bitDepth = functions::toInt(bitdepthStr);
-  if (bitDepth && *bitDepth >= 8 && *bitDepth <= 16)
+  if (bitDepth && *bitDepth >= 8 && *bitDepth <= 32)
     return *bitDepth;
   return {};
 }
@@ -429,7 +429,7 @@ int64_t PixelFormatYUV::bytesPerFrame(const Size &frameSize) const
       // 422 10 bit with 6 Y values per 16 bytes. Width is rounded up to a multiple of 48.
       // Although there is a weird expception to this in the standard.
       auto roundedUpWidth = (((frameSize.width + 48 - 1) / 48) * 48);
-      return frameSize.height * roundedUpWidth * 16 / 6;
+      return int64_t(frameSize.height) * roundedUpWidth * 16 / 6;
     }
     return 0;
   }
@@ -446,7 +446,7 @@ int64_t PixelFormatYUV::bytesPerFrame(const Size &frameSize) const
     {
       // All packing orders have 4 values per packed value (which has 2 Y samples)
       const auto bitsPerPixel = packedFormat->bitsPerSample * 4;
-      return ((bitsPerPixel + 7) / 8) * (frameSize.width / 2) * frameSize.height;
+      return int64_t((bitsPerPixel + 7) / 8) * (frameSize.width / 2) * frameSize.height;
     }
     // This is a packed format. The added number of bytes might be lower because of the packing.
     if (packedFormat->subsampling == Subsampling::YUV_444)
@@ -456,7 +456,7 @@ int64_t PixelFormatYUV::bytesPerFrame(const Size &frameSize) const
           packedFormat->packingOrder == PackingOrder::YUVA ||
           packedFormat->packingOrder == PackingOrder::VUYA)
         bitsPerPixel += packedFormat->bitsPerSample;
-      return ((bitsPerPixel + 7) / 8) * frameSize.width * frameSize.height;
+      return int64_t((bitsPerPixel + 7) / 8) * frameSize.width * frameSize.height;
     }
     // else if (subsampling == Subsampling::YUV_422 || subsampling == Subsampling::YUV_440)
     //{
@@ -491,8 +491,8 @@ PixelFormatYUV::bytesPerFramePerComponent(const Size &frameSize) const
     // The numbers are the same for planar and packed formats as long as no byte packing is used.
     // The only difference is the order of the bytes in memory.
 
-    const auto bytesPerSample = (this->getBitsPerSample() + 7) / 8;
-    bytes.luma                = frameSize.area() * bytesPerSample;
+    const auto nrBytes = bytesPerSample(this->getBitsPerSample());
+    bytes.luma         = int64_t(frameSize.width) * frameSize.height * nrBytes;
 
     switch (this->getSubsampling())
     {

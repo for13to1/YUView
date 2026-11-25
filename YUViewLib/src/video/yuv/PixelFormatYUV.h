@@ -32,6 +32,9 @@
 
 #pragma once
 
+#include <cassert>
+#include <vector>
+
 #include <common/EnumMapper.h>
 #include <common/Offset.h>
 #include <common/Size.h>
@@ -98,15 +101,16 @@ class MathParameters
 {
 public:
   MathParameters() = default;
-  MathParameters(int scale, int offset, bool invert) : scale(scale), offset(offset), invert(invert)
+  MathParameters(int scale, int64_t offset, bool invert)
+      : scale(scale), offset(offset), invert(invert)
   {
   }
   // Do we need to apply any transform to the raw YUV data before conversion to RGB?
   bool mathRequired() const { return scale != 1 || invert; }
 
-  int  scale{1};
-  int  offset{128};
-  bool invert{};
+  int     scale{1};
+  int64_t offset{128}; // For high bit depths this does not fit into an int.
+  bool    invert{};
 };
 
 enum class PredefinedPixelFormat
@@ -195,7 +199,19 @@ constexpr EnumMapper<PlaneOrder, 4> PlaneOrderMapper = {std::make_pair(PlaneOrde
                                                         std::make_pair(PlaneOrder::YUVA, "YUVA"),
                                                         std::make_pair(PlaneOrder::YVUA, "YVUA")};
 
-const auto BitDepthList = std::vector<int>({8, 9, 10, 12, 14, 16});
+const auto BitDepthList = []()
+{
+  std::vector<int> list;
+  for (int bitDepth = 8; bitDepth <= 32; bitDepth++)
+    list.push_back(bitDepth);
+  return list;
+}();
+
+constexpr int bytesPerSample(const int bitsPerSample)
+{
+  assert(bitsPerSample >= 1 && bitsPerSample <= 32);
+  return (bitsPerSample > 16) ? 4 : (bitsPerSample > 8) ? 2 : 1;
+}
 
 struct PlanarPixelFormat
 {

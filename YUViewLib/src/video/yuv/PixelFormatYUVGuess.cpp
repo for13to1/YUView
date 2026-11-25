@@ -69,7 +69,14 @@ std::vector<int> getDetectionBitDepthList(const std::optional<int> &detectedBitr
 {
   if (detectedBitrate)
     return {*detectedBitrate};
-  return {10, 12, 14, 16, 8};
+  // The format name for 8 bit has no bit depth in it, and yuv420p is a prefix of yuv420p10le.
+  // So 8 bit has to be tried last, otherwise it matches every file name with a bit depth.
+  std::vector<int> bitDepths = {10, 12, 14, 16};
+  for (const auto bitDepth : BitDepthList)
+    if (bitDepth != 8 && !contains(bitDepths, bitDepth))
+      bitDepths.push_back(bitDepth);
+  bitDepths.push_back(8);
+  return bitDepths;
 }
 
 std::vector<Subsampling> getDetectionSubsamplingList(Subsampling subsamplingToForceAsFirst,
