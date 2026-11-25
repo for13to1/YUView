@@ -227,12 +227,10 @@ MainWindow::MainWindow(bool useAlternativeSources, QWidget *parent) : QMainWindo
 
 QWidget *MainWindow::getMainWindow()
 {
-  QWidgetList l = QApplication::topLevelWidgets();
-  for (QWidget *w : l)
+  for (const auto widget : QApplication::topLevelWidgets())
   {
-    MainWindow *mw = dynamic_cast<MainWindow *>(w);
-    if (mw)
-      return mw;
+    if (const auto mainWindow = dynamic_cast<MainWindow *>(widget))
+      return mainWindow;
   }
   return nullptr;
 }
@@ -701,7 +699,7 @@ void MainWindow::toggleFullscreen()
     if (panelsVisible[4])
       ui.cachingInfoDock->show();
 
-    if (!is_Q_OS_MAC)
+    if (!is_Q_OS_MACOS)
       ui.menuBar->show();
     ui.tabWidget->tabBar()->show();
 
@@ -730,7 +728,7 @@ void MainWindow::toggleFullscreen()
     ui.fileInfoDock->hide();
     ui.cachingInfoDock->hide();
 
-    if (!is_Q_OS_MAC)
+    if (!is_Q_OS_MACOS)
       ui.menuBar->hide();
     ui.tabWidget->tabBar()->hide();
 
@@ -798,17 +796,16 @@ void MainWindow::updateSettings()
   // Set the right theme
   QSettings settings;
   QString   themeName = settings.value("Theme", "Default").toString();
-  QString   themeFile = functions::getThemeFileName(themeName);
+  QString   themeFileName = functions::getThemeFileName(themeName);
 
   QString styleSheet;
-  if (!themeFile.isEmpty())
+  if (!themeFileName.isEmpty())
   {
     // Get the qss text of the theme
-    QFile f(themeFile);
-    if (f.exists())
+    QFile themeFile(themeFileName);
+    if (themeFile.exists() && themeFile.open(QFile::ReadOnly | QFile::Text))
     {
-      f.open(QFile::ReadOnly | QFile::Text);
-      QTextStream ts(&f);
+      QTextStream ts(&themeFile);
       styleSheet = ts.readAll();
 
       // Now replace the placeholder color values with the real values
@@ -962,7 +959,7 @@ void MainWindow::resetWindowLayout()
   ui.cachingInfoDock->setFloating(false);
 
   // show the menu bar
-  if (!is_Q_OS_MAC)
+  if (!is_Q_OS_MACOS)
     ui.menuBar->show();
 
   // Reset main window state (the size and position of the dock widgets). The code to obtain this
